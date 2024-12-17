@@ -2,6 +2,9 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(plyr)
+# devtools::install_github("davidsjoberg/ggsankey")
+library(ggsankey)
+library(eulerr)
 
 data <- read.csv("../NAIOP.csv") |>
   tidyr::separate(employee_count, into = c("employee_min", "employee_max"), sep = "-", fill = "right") |>
@@ -337,5 +340,92 @@ ggplot(sector_delta_df |> dplyr::filter(delta > -1), aes(x = Name, y = factor(de
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-print(">>>>>>>>>>>>>> DELTA")  
+print("<<<<<<<<<<<<<<<<<< DELTA")  
 
+
+print(">>>>>>>>>>>>>>>>>>")
+print("how many firms are in the sectors we care about")
+main_sector_cols = c("sector_development", "sector_investment", "sector_pm", "sector_architecture", "sector_construction")
+sectors_df <- data_odd |>
+  dplyr::select(c("Name", "type_of_company", "landlording", "REIT", 
+                  "investment_other",  "development_commercial", "development_residential", "development_industrial", "development_city", 
+                  "property_management", "asset_management", "architecture", "construction")) |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    sector_development = ifelse((grepl("Development", type_of_company) | development_commercial == "X" | development_residential == "X" | development_industrial == "X" | development_city == "X"), TRUE, FALSE),
+    sector_investment = ifelse((grepl("Investment", type_of_company) | grepl("Landlording", type_of_company) | grepl("Asset", type_of_company) | investment_other == "X" | landlording == "X" | REIT == "X" | asset_management == "X"), TRUE, FALSE),
+    sector_pm = ifelse((grepl("Property", type_of_company) | property_management == "X"), TRUE, FALSE),
+    sector_architecture = ifelse((grepl("Architecture", type_of_company) | architecture == "X"), TRUE, FALSE),
+    sector_construction = ifelse((grepl("Construction", type_of_company) | construction == "X"), TRUE, FALSE)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::select(main_sector_cols)
+
+main_sector_summary <- sectors_df |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    development = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
+    development_investment = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), ,
+    development_investment_pm = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
+    development_investment_pm_architecture = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0),
+    development_investment_pm_architecture_construction = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0),
+    development_pm = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
+    development_pm_architecture = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0),
+    development_pm_architecture_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
+    development_architecture = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
+    development_architecture_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
+    development_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
+    investment = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
+    investment_pm = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
+    investment_pm_architecture = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
+    investment_pm_architecture_construction = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0),
+    investment_architecture = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
+    investment_architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
+    investment_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
+    pm = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
+    pm_architecture = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
+    pm_architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
+    pm_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
+    architecture = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
+    architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
+    construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::summarise(count = n(),
+                   development = sum(development),
+                   development_investment = sum(development_investment),
+                   development_investment_pm = sum(development_investment_pm),
+                   development_investment_pm_architecture = sum(development_investment_pm_architecture),
+                   development_investment_pm_architecture_construction = sum(development_investment_pm_architecture_construction), 
+                   development_pm = sum(development_pm), 
+                   development_pm_architecture = sum(development_pm_architecture), 
+                   development_pm_architecture_construction = sum(development_pm_architecture_construction),
+                   development_architecture = sum(development_architecture),
+                   development_architecture_construction = sum(development_architecture_construction),
+                   development_construction = sum(development_construction),
+                   investment = sum(investment),
+                   investment_pm = sum(investment_pm),
+                   investment_pm_architecture = sum(investment_pm_architecture),
+                   investment_pm_architecture_construction = sum(investment_pm_architecture_construction), 
+                   investment_architecture = sum(investment_architecture),
+                   investment_architecture_construction = sum(investment_architecture_construction),
+                   investment_construction = sum(investment_construction),
+                   pm = sum(pm),
+                   pm_architecture = sum(pm_architecture),
+                   pm_architecture_construction = sum(pm_architecture_construction),
+                   pm_construction = sum(pm_construction),
+                   architecture = sum(architecture),
+                   architecture_construction = sum(architecture_construction),
+                   construction = sum(construction)
+  )
+
+main_sector_summary <- main_sector_summary |> 
+  pivot_longer(cols = colnames(main_sector_summary)) |>
+  dplyr::filter(value > 0) |> 
+  dplyr::arrange(desc(value))
+
+values <- as.numeric((main_sector_summary |> dplyr::filter(name != "count"))$value) 
+names(values) <- (main_sector_summary |> dplyr::filter(name != "count"))$name
+pie(values, main = "Pie Chart of Categories")
+sum(values)
+print("<<<<<<<<<<<<<<<<< sectors we care about")
