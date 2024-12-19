@@ -5,6 +5,7 @@ library(plyr)
 # devtools::install_github("davidsjoberg/ggsankey")
 library(ggsankey)
 library(eulerr)
+library(ggflowchart)
 
 data <- read.csv("../NAIOP.csv") |>
   tidyr::separate(employee_count, into = c("employee_min", "employee_max"), sep = "-", fill = "right") |>
@@ -25,8 +26,8 @@ data <- read.csv("../NAIOP.csv") |>
 # data <- data |> slice(1:226)
 # data <- data |> group_by(Name) |> 
 only_odd <- seq_len(nrow(data)) %% 2      
-data_odd <- data[only_odd == 1, ]             # Subset odd rows
-data_even <- data[only_odd == 0, ] 
+data_odd <- data[only_odd == 1, ] |> dplyr::filter(nchar(URL) > 1)  
+data_even <- data[only_odd == 0, ] |> dplyr::filter(nchar(created_year) > 1)
 
 sector_cols <- c("created_year", "international", "landlording", "REIT", 
              "investment_other",  "development_commercial", "development_residential", "development_industrial", "development_city", 
@@ -332,8 +333,8 @@ ggplot(sector_delta_df |> dplyr::filter(delta > -1), aes(x = Name, y = factor(de
   geom_tile(color = "#c9cbfc") +  # Add grid lines
   scale_fill_gradient(low = "#c9cbfc", high = "blue") +  # Set gradient colors
   labs(
-    x = "delta", 
-    y = "name", 
+    x = "name", 
+    y = "delta", 
     fill = "Count",
     title = "Heatmap of Delta Counts by ID"
   ) +
@@ -343,89 +344,98 @@ ggplot(sector_delta_df |> dplyr::filter(delta > -1), aes(x = Name, y = factor(de
 print("<<<<<<<<<<<<<<<<<< DELTA")  
 
 
-print(">>>>>>>>>>>>>>>>>>")
-print("how many firms are in the sectors we care about")
-main_sector_cols = c("sector_development", "sector_investment", "sector_pm", "sector_architecture", "sector_construction")
-sectors_df <- data_odd |>
-  dplyr::select(c("Name", "type_of_company", "landlording", "REIT", 
-                  "investment_other",  "development_commercial", "development_residential", "development_industrial", "development_city", 
-                  "property_management", "asset_management", "architecture", "construction")) |>
-  dplyr::rowwise() |>
-  dplyr::mutate(
-    sector_development = ifelse((grepl("Development", type_of_company) | development_commercial == "X" | development_residential == "X" | development_industrial == "X" | development_city == "X"), TRUE, FALSE),
-    sector_investment = ifelse((grepl("Investment", type_of_company) | grepl("Landlording", type_of_company) | grepl("Asset", type_of_company) | investment_other == "X" | landlording == "X" | REIT == "X" | asset_management == "X"), TRUE, FALSE),
-    sector_pm = ifelse((grepl("Property", type_of_company) | property_management == "X"), TRUE, FALSE),
-    sector_architecture = ifelse((grepl("Architecture", type_of_company) | architecture == "X"), TRUE, FALSE),
-    sector_construction = ifelse((grepl("Construction", type_of_company) | construction == "X"), TRUE, FALSE)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::select(main_sector_cols)
 
-main_sector_summary <- sectors_df |>
-  dplyr::rowwise() |>
-  dplyr::mutate(
-    development = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
-    development_investment = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), ,
-    development_investment_pm = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
-    development_investment_pm_architecture = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0),
-    development_investment_pm_architecture_construction = ifelse((sector_development == TRUE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0),
-    development_pm = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
-    development_pm_architecture = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0),
-    development_pm_architecture_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
-    development_architecture = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
-    development_architecture_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
-    development_construction = ifelse((sector_development == TRUE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
-    investment = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0),
-    investment_pm = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
-    investment_pm_architecture = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
-    investment_pm_architecture_construction = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0),
-    investment_architecture = ifelse((sector_development == FALSE & sector_investment == TRUE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
-    investment_architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
-    investment_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
-    pm = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == FALSE), 1, 0), 
-    pm_architecture = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
-    pm_architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
-    pm_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == TRUE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0), 
-    architecture = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == FALSE), 1, 0), 
-    architecture_construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == TRUE & sector_construction == TRUE), 1, 0), 
-    construction = ifelse((sector_development == FALSE & sector_investment == FALSE & sector_pm == FALSE & sector_architecture == FALSE & sector_construction == TRUE), 1, 0)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::summarise(count = n(),
-                   development = sum(development),
-                   development_investment = sum(development_investment),
-                   development_investment_pm = sum(development_investment_pm),
-                   development_investment_pm_architecture = sum(development_investment_pm_architecture),
-                   development_investment_pm_architecture_construction = sum(development_investment_pm_architecture_construction), 
-                   development_pm = sum(development_pm), 
-                   development_pm_architecture = sum(development_pm_architecture), 
-                   development_pm_architecture_construction = sum(development_pm_architecture_construction),
-                   development_architecture = sum(development_architecture),
-                   development_architecture_construction = sum(development_architecture_construction),
-                   development_construction = sum(development_construction),
-                   investment = sum(investment),
-                   investment_pm = sum(investment_pm),
-                   investment_pm_architecture = sum(investment_pm_architecture),
-                   investment_pm_architecture_construction = sum(investment_pm_architecture_construction), 
-                   investment_architecture = sum(investment_architecture),
-                   investment_architecture_construction = sum(investment_architecture_construction),
-                   investment_construction = sum(investment_construction),
-                   pm = sum(pm),
-                   pm_architecture = sum(pm_architecture),
-                   pm_architecture_construction = sum(pm_architecture_construction),
-                   pm_construction = sum(pm_construction),
-                   architecture = sum(architecture),
-                   architecture_construction = sum(architecture_construction),
-                   construction = sum(construction)
-  )
+## clustering algorithm ??
+# tsne on booleans, maybe on years?
+bool_data_odd <- data_odd |>
+  dplyr::select(-c(URL, type_of_company, originally, self_description, type_of_vertical_integration, created_year, employee_count, other_what, notes)) |>
+  dplyr::mutate(across(-c(Name), ~ .x == "X"))
 
-main_sector_summary <- main_sector_summary |> 
-  pivot_longer(cols = colnames(main_sector_summary)) |>
-  dplyr::filter(value > 0) |> 
-  dplyr::arrange(desc(value))
+df_numeric <- data.matrix(bool_data_odd |> dplyr::select(-c(Name))) * 1  # Multiplying by 1 coerces TRUE to 1, FALSE to 0
+set.seed(42)  # Set seed for reproducibility
+tsne_result <- Rtsne(df_numeric, dims = 2, perplexity = 2, verbose = TRUE, max_iter = 500, check_duplicates=FALSE)
 
-values <- as.numeric((main_sector_summary |> dplyr::filter(name != "count"))$value) 
-names(values) <- (main_sector_summary |> dplyr::filter(name != "count"))$name
-pie(values, main = "Pie Chart of Categories")
-sum(values)
-print("<<<<<<<<<<<<<<<<< sectors we care about")
+tsne_df <- data.frame(
+  TSNE1 = tsne_result$Y[, 1],
+  TSNE2 = tsne_result$Y[, 2]
+)
+ggplot(tsne_df, aes(x = TSNE1, y = TSNE2)) +
+  geom_point(color = "blue", size = 3) +
+  theme_minimal() +
+  ggtitle("t-SNE Visualization") +
+  xlab("TSNE1") +
+  ylab("TSNE2")
+
+print(">>>>>>>>>>>>>>>>>> flowchart")
+
+flowchart_df <- data_even |> 
+  select(Name, where(~ any(!is.na(suppressWarnings(as.numeric(.)))))) |>
+  dplyr::select(-c("other_what", "employee_count", "notes", "international")) |>
+  dplyr::select(-c(starts_with("focused_"))) |>
+  dplyr::mutate(across(
+    where(is.character) & !matches("Name"), 
+    ~ as.numeric(.)            
+  )) |>
+  dplyr::mutate(across(where(is.numeric), ~ ifelse(. < 0, NA, .)))
+
+
+rank_columns <- function(row, year_cols) {
+  sectors <- row |> dplyr::select(where(function(x) any(!is.na(x)))) |> dplyr::select(-c(created_year)) 
+  year_ranks <- split(names(sectors), as.numeric(sectors))
+  year_ranks[order(as.numeric(names(year_ranks)))]
+}
+
+# ranked_list <- apply(flowchart_df, 1, rank_columns, year_cols = colnames(flowchart_df))
+
+print(ranked_list)
+t <- flowchart_df[1,]
+
+t<- t |> dplyr::select(where(function(x) any(!is.na(x)))) |> dplyr::select(-c(created_year)) 
+split(names(t), as.numeric(t))
+
+generate_dot_for_corp <- function(years, ranks) {
+  # print(ranks)
+  dot <- "digraph G {\n  rankdir=TB;\n"
+  ordering <- c()
+  for (y in years) {
+    if (length(ranks[y]) > 0) {
+    dot <- paste0(dot, "  subgraph cluster_", gsub(" ", "_", y), " {\n")
+    dot <- paste0(dot, "    node[shape=record];\n")
+    dot <- paste0(dot, "    label=\"", y, "\";\n")
+    nodes <- lapply(ranks[y], function (x) paste0("\"", x,"\""))
+    print(nodes)
+    ordering[length(ordering)+1] <- nodes[[1]][1]
+    dot <- paste0(dot, paste( unlist(nodes), collapse=' '), ";\n")
+    dot <- paste0(dot, "  }\n")
+    }
+  }
+  if (length(ordering) > 1) {
+    for (i in seq_along(ordering)){
+      if (i < length(ordering)) {
+        dot <- paste0(dot, ordering[i][1], "->", ordering[i+1][1], "[style=invis];\n", sep = " ")
+      }
+    }
+  }
+  dot <- paste0(dot, "}")
+  return(dot)
+}
+
+generate_dot <- function(flowchart_df) {
+  for (i in 1:nrow(flowchart_df)) {
+    print(flowchart_df[i,]$Name)
+    ranked_list <- rank_columns(flowchart_df[i,], colnames(flowchart_df))
+    # print(flowchart_df[i,]$Name)
+    file_name <- paste0("output/", flowchart_df[i,]$Name, "_flowchart.dot")
+    # print(generate_dot_for_corp(names(ranked_list), ranked_list))
+    writeLines(generate_dot_for_corp(names(ranked_list), ranked_list), file_name)
+  }
+}
+
+# Generate and save the Graphviz DOT code
+dot_code <- generate_dot(flowchart_df)
+# d_code <- generate_dot(ranked_list[[76]])
+# writeLines(dot_code, "output_flowchart.dot")
+# writeLines(d_code, "output_flowchart.dot")
+
+cat(dot_code)
+print("<<<<<<<<<<<<<<<<<< flowchart")
